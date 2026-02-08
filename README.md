@@ -1,43 +1,58 @@
 # YouTube Analytics MCP Server
 
-A Model Context Protocol (MCP) server for YouTube Analytics data access with demographics and discovery tools, built with a scalable config-driven architecture.
+A Model Context Protocol (MCP) server for YouTube Analytics — 26 tools for channel health, video performance, audience insights, revenue, and more.
 
-## Core Features
+## Installation
 
-- **Channel Analytics**: Get comprehensive channel overview, growth patterns, and vital signs
-- **Video Performance**: Analyze individual video metrics, audience retention, and drop-off points
-- **Viewer Demographics**: Access age/gender breakdowns and geographic distribution data
-- **Discovery Insights**: Understand traffic sources and search terms driving views
-- **Engagement Metrics**: Track likes, comments, shares, and viewer interaction patterns
-- **Audience Retention**: Identify exact moments where viewers drop off for content optimization
-- **Performance Comparison**: Compare metrics between different time periods
-- **Public Channel Analysis**: Research competitor channels and trending content
+### Claude Code
 
-## Core Architecture Principles
+```bash
+claude mcp add youtube-analytics --scope user -- npx youtube-analytics-mcp@latest
+```
 
-This MCP server follows a **config-driven architecture** that provides:
+### Claude Desktop
 
-- **Maintainability**: Clear separation between tool definitions and implementation
-- **Scalability**: Easy to add new tools without modifying core server logic
-- **Consistency**: Standardized error handling and response formatting
-- **Readability**: Clean, declarative configuration that serves as documentation
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "youtube-analytics": {
+      "command": "npx",
+      "args": ["youtube-analytics-mcp@latest"]
+    }
+  }
+}
+```
+
+### Codex
+
+```bash
+codex mcp add youtube-analytics -- npx youtube-analytics-mcp@latest
+```
+
+### Manual / Other Clients
+
+```bash
+npx youtube-analytics-mcp@latest
+```
 
 ## Setup
 
-### 1. Google API Credentials
-
-To use this YouTube Analytics MCP server, you need to set up Google API credentials:
+### Google API Credentials
 
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select an existing one
-3. Enable the YouTube Analytics API and YouTube Data API v3
-4. Go to "Credentials" and create a new OAuth 2.0 Client ID
+3. Enable the **YouTube Analytics API** and **YouTube Data API v3**
+4. Go to "Credentials" and create a new **OAuth 2.0 Client ID**
 5. Download the credentials as JSON
 6. Save the file as `credentials.json` in the `src/auth/` directory
 
-**Privacy Note**: All data processing happens locally on your computer. Your credentials and analytics data never leave your machine - the server runs entirely locally and connects directly to Google's APIs from your system.
+On first use, the server will open a browser window for OAuth authentication. Tokens are cached locally for subsequent use.
 
-### 2. Development
+**Privacy Note**: All data processing happens locally on your computer. Your credentials and analytics data never leave your machine.
+
+## Development
 
 ```bash
 # Install dependencies
@@ -91,36 +106,46 @@ interface ToolConfig<T = any> {
 }
 ```
 
-## Available Tools
-
-### Authentication Tools
-- `check_auth_status` - Check YouTube authentication status
-- `revoke_auth` - Revoke authentication and clear tokens
+## Available Tools (26)
 
 ### Channel Tools
 - `get_channel_info` - Get basic channel information
 - `get_channel_videos` - Get list of channel videos with filters
+- `get_video_details` - Get detailed info for a specific video (title, tags, stats, duration)
 
 ### Health Tools
 - `get_channel_overview` - Get channel vital signs and growth patterns
 - `get_comparison_metrics` - Compare metrics between time periods
 - `get_average_view_percentage` - Get average view percentage
+- `get_watch_time_metrics` - Get daily watch time breakdown
+- `get_revenue_metrics` - Get revenue, ad revenue, YouTube Premium revenue, and CPM
+- `get_top_videos` - Get top performing videos ranked by any metric
 
 ### Audience Tools
 - `get_video_demographics` - Get age/gender breakdown
 - `get_geographic_distribution` - Get viewer geographic distribution
 - `get_subscriber_analytics` - Get subscriber vs non-subscriber analytics
+- `get_device_analytics` - Get device type and OS breakdown (mobile, desktop, TV, etc.)
 
 ### Discovery Tools
+- `get_optimal_posting_time` - Get optimal posting time analysis with day-of-week patterns
 - `get_traffic_sources` - Get traffic source analysis
 - `get_search_terms` - Get search terms for SEO insights
 
 ### Performance Tools
 - `get_audience_retention` - Track viewer retention patterns
 - `get_retention_dropoff_points` - Find exact drop-off moments
+- `get_playlist_performance` - Get playlist starts, views per start, and average time
+- `get_card_endscreen_performance` - Get card impressions, clicks, and click-through rate
+- `get_video_performance_over_time` - Get daily performance breakdown for a specific video
 
 ### Engagement Tools
 - `get_engagement_metrics` - Analyze likes, comments, and shares
+- `get_sharing_analytics` - Get sharing service breakdown (WhatsApp, Twitter, etc.)
+
+### Authentication Tools
+- `check_auth_status` - Check YouTube authentication status
+- `revoke_auth` - Revoke authentication and clear tokens
 
 ## Adding New Tools
 
