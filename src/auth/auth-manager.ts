@@ -24,7 +24,7 @@ export class AuthManager {
   private readonly SCOPES = [
     'https://www.googleapis.com/auth/youtube.readonly',
     'https://www.googleapis.com/auth/yt-analytics.readonly',
-    'https://www.googleapis.com/auth/youtubepartner'
+    'https://www.googleapis.com/auth/yt-analytics-monetary.readonly'
   ];
 
   private authClient: OAuth2Client | null = null;
