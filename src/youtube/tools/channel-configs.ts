@@ -51,13 +51,60 @@ export const channelTools: ToolConfig[] = [
           endDate,
           maxResults: Math.min(maxResults, 50)
         });
-        
+
         const formattedText = formatVideoList({ videos, filterOptions: { query, startDate, endDate } });
-        
+
         return {
           content: [{
             type: "text",
             text: formattedText
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          }],
+          isError: true
+        };
+      }
+    },
+  },
+  {
+    name: "get_video_details",
+    description: "Get detailed info for a specific video including title, description, tags, stats, duration, and content details",
+    category: "channel",
+    schema: z.object({
+      videoId: z.string().describe("Video ID to get details for")
+    }),
+    handler: async ({ videoId }, { getYouTubeClient }: ToolContext) => {
+      try {
+        const youtubeClient = await getYouTubeClient();
+        const video = await youtubeClient.getVideoDetails(videoId);
+
+        let output = `Video Details for ${videoId}:\n\n`;
+        output += `Title: ${video.snippet.title}\n`;
+        output += `Published: ${video.snippet.publishedAt}\n`;
+        output += `Duration: ${video.contentDetails.duration}\n`;
+        output += `Definition: ${video.contentDetails.definition}\n`;
+        output += `Caption: ${video.contentDetails.caption}\n\n`;
+
+        output += `Statistics:\n`;
+        output += `  Views: ${Number(video.statistics.viewCount).toLocaleString()}\n`;
+        output += `  Likes: ${Number(video.statistics.likeCount).toLocaleString()}\n`;
+        output += `  Comments: ${Number(video.statistics.commentCount).toLocaleString()}\n\n`;
+
+        if (video.snippet.tags && video.snippet.tags.length > 0) {
+          output += `Tags: ${video.snippet.tags.join(', ')}\n\n`;
+        }
+
+        output += `Description:\n${video.snippet.description}`;
+
+        return {
+          content: [{
+            type: "text",
+            text: output
           }]
         };
       } catch (error) {

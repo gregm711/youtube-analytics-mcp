@@ -37,36 +37,47 @@ export function parseChannelOverview(data: ParsedAnalytics): ChannelOverviewData
   }
 
   const metrics = data.columnHeaders?.map((header: ColumnHeader) => header.name) || [];
-  const totalRow = data.rows[0] || [];
-  
-  const result: ChannelOverviewData = {
-    totalViews: 0,
-    estimatedMinutesWatched: 0,
-    subscribersGained: 0,
-    averageViewDuration: 0
-  };
-  
+
+  // Build metric index map
+  const metricIndices: { [key: string]: number } = {};
   metrics.forEach((metric: string, index: number) => {
-    const value = Number(totalRow[index] || 0);
-    
-    switch (metric) {
-      case 'views':
-        result.totalViews = value;
-        break;
-      case 'estimatedMinutesWatched':
-        result.estimatedMinutesWatched = value;
-        break;
-      case 'subscribersGained':
-        result.subscribersGained = value;
-        break;
-      case 'averageViewDuration':
-        result.averageViewDuration = value;
-        break;
-      case 'averageViewPercentage':
-        result.averageViewPercentage = value;
-        break;
-    }
+    metricIndices[metric] = index;
   });
+
+  // Summable metrics get totaled across all rows (each row = one day)
+  const summableKeys = ['views', 'estimatedMinutesWatched', 'subscribersGained'];
+  // Rate metrics get averaged across all rows
+  const averageKeys = ['averageViewDuration', 'averageViewPercentage'];
+
+  const sums: { [key: string]: number } = {};
+  let rowCount = 0;
+
+  [...summableKeys, ...averageKeys].forEach(m => { sums[m] = 0; });
+
+  data.rows.forEach((row: any[]) => {
+    rowCount++;
+    summableKeys.forEach(metric => {
+      if (metricIndices[metric] !== undefined) {
+        sums[metric] += Number(row[metricIndices[metric]] || 0);
+      }
+    });
+    averageKeys.forEach(metric => {
+      if (metricIndices[metric] !== undefined) {
+        sums[metric] += Number(row[metricIndices[metric]] || 0);
+      }
+    });
+  });
+
+  const result: ChannelOverviewData = {
+    totalViews: sums['views'] || 0,
+    estimatedMinutesWatched: sums['estimatedMinutesWatched'] || 0,
+    subscribersGained: sums['subscribersGained'] || 0,
+    averageViewDuration: rowCount > 0 ? sums['averageViewDuration'] / rowCount : 0
+  };
+
+  if (metricIndices['averageViewPercentage'] !== undefined && rowCount > 0) {
+    result.averageViewPercentage = sums['averageViewPercentage'] / rowCount;
+  }
 
   return result;
 }

@@ -568,6 +568,40 @@ export class YouTubeClient {
     });
   }
 
+  // Revenue Analytics methods
+  async getRevenueMetrics(params: { startDate: string; endDate: string; videoId?: string }): Promise<any> {
+    const filters = params.videoId ? `video==${params.videoId}` : undefined;
+    return this.getChannelAnalytics({
+      ...params,
+      metrics: ['estimatedRevenue', 'estimatedAdRevenue', 'estimatedRedPartnerRevenue', 'grossRevenue', 'cpm', 'playbackBasedCpm', 'views'],
+      dimensions: ['day'],
+      filters,
+      sort: 'day'
+    });
+  }
+
+  // Top Videos methods
+  async getTopVideos(params: { startDate: string; endDate: string; metric?: string; maxResults?: number }): Promise<any> {
+    const sortMetric = params.metric || 'views';
+    return this.getChannelAnalytics({
+      ...params,
+      metrics: ['views', 'estimatedMinutesWatched', 'likes', 'comments', 'shares', 'subscribersGained', 'averageViewDuration', 'averageViewPercentage'],
+      dimensions: ['video'],
+      sort: `-${sortMetric}`,
+      maxResults: params.maxResults || 10
+    });
+  }
+
+  // Video Performance Over Time
+  async getVideoPerformanceOverTime(params: { videoId: string; startDate: string; endDate: string }): Promise<any> {
+    return this.getVideoAnalytics(params.videoId, {
+      ...params,
+      metrics: ['views', 'estimatedMinutesWatched', 'likes', 'comments', 'shares', 'subscribersGained', 'averageViewDuration'],
+      dimensions: ['day'],
+      sort: 'day'
+    });
+  }
+
   // Utility methods
   private async withRetry<T>(fn: () => Promise<T>, maxRetries: number = 3): Promise<T> {
     for (let i = 0; i < maxRetries; i++) {
