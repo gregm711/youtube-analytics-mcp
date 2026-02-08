@@ -2,12 +2,25 @@ import { authenticate } from '@google-cloud/local-auth';
 import { promises as fs } from 'fs';
 import { OAuth2Client } from 'google-auth-library';
 import path from 'path';
-import { AuthConfig, AuthenticationError, TokenData, TokenExpiredError } from './types.js';
+import { fileURLToPath } from 'url';
+import { AuthConfig, OAuthClientConfig, AuthenticationError, TokenData, TokenExpiredError } from './types.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Extract OAuth client config from either "web" or "installed" credential types
+function getOAuthConfig(credentials: AuthConfig): OAuthClientConfig {
+  const config = credentials.web || credentials.installed;
+  if (!config) {
+    throw new AuthenticationError('Invalid credentials.json — must contain "web" or "installed" key');
+  }
+  return config;
+}
 
 export class AuthManager {
-  private readonly AUTH_DIR = path.join(process.cwd(), 'src', 'auth');
-  private readonly CREDENTIALS_PATH = path.join(this.AUTH_DIR, 'credentials.json');
-  private readonly TOKEN_PATH = path.join(this.AUTH_DIR, 'token.json');
+  private readonly AUTH_DIR: string;
+  private readonly CREDENTIALS_PATH: string;
+  private readonly TOKEN_PATH: string;
   private readonly SCOPES = [
     'https://www.googleapis.com/auth/youtube.readonly',
     'https://www.googleapis.com/auth/yt-analytics.readonly',
@@ -17,6 +30,45 @@ export class AuthManager {
   private authClient: OAuth2Client | null = null;
 
   constructor() {
+    // User token storage: ~/.youtube-analytics-mcp/
+    const userDir = path.join(process.env.HOME || process.env.USERPROFILE || '.', '.youtube-analytics-mcp');
+
+    this.TOKEN_PATH = process.env.YOUTUBE_TOKEN_PATH
+      || path.join(userDir, 'token.json');
+
+    // Credentials lookup order:
+    // 1. YOUTUBE_CREDENTIALS_PATH env var
+    // 2. ~/.youtube-analytics-mcp/credentials.json (user-provided)
+    // 3. Bundled credentials.json shipped with the npm package
+    this.CREDENTIALS_PATH = process.env.YOUTUBE_CREDENTIALS_PATH
+      || path.join(userDir, 'credentials.json');
+
+    this.AUTH_DIR = path.dirname(this.CREDENTIALS_PATH);
+  }
+
+  // Resolve credentials path, falling back to bundled credentials
+  private async resolveCredentialsPath(): Promise<string> {
+    // Check primary path (env var or ~/.youtube-analytics-mcp/)
+    try {
+      await fs.access(this.CREDENTIALS_PATH);
+      return this.CREDENTIALS_PATH;
+    } catch {}
+
+    // Fall back to bundled credentials shipped with the package
+    // auth-manager.js is at build/auth/, so package root is ../../
+    const bundledPath = path.join(__dirname, '..', '..', 'credentials.json');
+    try {
+      await fs.access(bundledPath);
+      return bundledPath;
+    } catch {}
+
+    throw new AuthenticationError(
+      `No credentials found. Checked:\n` +
+      `  1. ${this.CREDENTIALS_PATH}\n` +
+      `  2. ${bundledPath} (bundled)\n\n` +
+      'To fix: place your Google OAuth credentials JSON at one of these paths, ' +
+      'or set YOUTUBE_CREDENTIALS_PATH environment variable.'
+    );
   }
 
   async getAuthClient(): Promise<OAuth2Client> {
@@ -35,16 +87,18 @@ export class AuthManager {
       // Try to load existing token
       const content = await fs.readFile(this.TOKEN_PATH, 'utf8');
       const tokenData: TokenData = JSON.parse(content);
-      
+
       // Load credentials to get client_id and client_secret
-      const credentialsContent = await fs.readFile(this.CREDENTIALS_PATH, 'utf8');
+      const credentialsPath = await this.resolveCredentialsPath();
+      const credentialsContent = await fs.readFile(credentialsPath, 'utf8');
       const credentials: AuthConfig = JSON.parse(credentialsContent);
       
       // Create OAuth2Client with proper credentials
+      const oauthConfig = getOAuthConfig(credentials);
       this.authClient = new OAuth2Client(
-        credentials.web.client_id,
-        credentials.web.client_secret,
-        credentials.web.redirect_uris[0]
+        oauthConfig.client_id,
+        oauthConfig.client_secret,
+        oauthConfig.redirect_uris[0]
       );
       
       // Set the stored tokens
@@ -68,22 +122,16 @@ export class AuthManager {
 
   async authenticate(): Promise<OAuth2Client> {
     try {
-      // Check if credentials file exists
-      try {
-        await fs.access(this.CREDENTIALS_PATH);
-      } catch {
-        throw new AuthenticationError(
-          `Credentials file not found at ${this.CREDENTIALS_PATH}. ` +
-          'Please place your Google OAuth credentials in src/auth/credentials.json'
-        );
-      }
+      const credentialsPath = await this.resolveCredentialsPath();
+      console.log('Using credentials from:', credentialsPath);
 
-      console.log('Auth manager CREDENTIALS_PATH', this.CREDENTIALS_PATH);
+      // Ensure token directory exists
+      await fs.mkdir(path.dirname(this.TOKEN_PATH), { recursive: true });
 
       // Trigger OAuth flow using local-auth
       const client = await authenticate({
         scopes: this.SCOPES,
-        keyfilePath: this.CREDENTIALS_PATH,
+        keyfilePath: credentialsPath,
       });
 
       // Save tokens
@@ -136,14 +184,19 @@ export class AuthManager {
 
   private async saveToken(client: OAuth2Client): Promise<void> {
     try {
+      // Ensure token directory exists
+      await fs.mkdir(path.dirname(this.TOKEN_PATH), { recursive: true });
+
       // Read credentials to get client_id and client_secret
-      const credentialsContent = await fs.readFile(this.CREDENTIALS_PATH, 'utf8');
+      const credentialsPath = await this.resolveCredentialsPath();
+      const credentialsContent = await fs.readFile(credentialsPath, 'utf8');
       const credentials: AuthConfig = JSON.parse(credentialsContent);
 
+      const oauthConfig = getOAuthConfig(credentials);
       const tokenData: TokenData = {
         type: 'authorized_user',
-        client_id: credentials.web.client_id,
-        client_secret: credentials.web.client_secret,
+        client_id: oauthConfig.client_id,
+        client_secret: oauthConfig.client_secret,
         refresh_token: client.credentials.refresh_token!,
         access_token: client.credentials.access_token || undefined,
         expiry_date: client.credentials.expiry_date || undefined

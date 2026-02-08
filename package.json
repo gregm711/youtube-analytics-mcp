@@ -14,7 +14,8 @@
     "test": "npm run build && ./test_all_tools.sh && npm run inspect"
   },
   "files": [
-    "build"
+    "build",
+    "credentials.json"
   ],
   "author": "dogfrogfog",
   "license": "MIT",
