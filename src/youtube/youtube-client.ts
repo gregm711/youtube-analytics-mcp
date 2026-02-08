@@ -21,20 +21,31 @@ import {
 export class YouTubeClient {
   private youtube: youtube_v3.Youtube;
   private youtubeAnalytics: youtubeAnalytics_v2.Youtubeanalytics;
+  private channelId: string | undefined;
 
   constructor(auth: OAuth2Client) {
     this.youtube = google.youtube({ version: 'v3', auth });
     this.youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth });
+    this.channelId = process.env.YOUTUBE_CHANNEL_ID;
+  }
+
+  // Analytics API channel identifier
+  private get analyticsChannelId(): string {
+    return this.channelId ? `channel==${this.channelId}` : 'channel==MINE';
   }
 
   // YouTube Data API methods
   async getChannelInfo(): Promise<ChannelInfo> {
     try {
       const response = await this.withRetry(async () => {
-        return await this.youtube.channels.list({
-          part: ['snippet', 'statistics'],
-          mine: true
-        });
+        // Use specific channel ID if set, otherwise default to primary channel
+        const params: any = { part: ['snippet', 'statistics'] };
+        if (this.channelId) {
+          params.id = [this.channelId];
+        } else {
+          params.mine = true;
+        }
+        return await this.youtube.channels.list(params);
       });
 
       if (!response.data.items || response.data.items.length === 0) {
@@ -257,6 +268,40 @@ export class YouTubeClient {
     }
   }
 
+  // List all channels accessible to the authenticated user
+  async listChannels(): Promise<ChannelInfo[]> {
+    try {
+      const response = await this.withRetry(async () => {
+        return await this.youtube.channels.list({
+          part: ['snippet', 'statistics'],
+          mine: true,
+          maxResults: 50
+        });
+      });
+
+      return (response.data.items || []).map(channel => ({
+        id: channel.id!,
+        snippet: {
+          title: channel.snippet!.title!,
+          description: channel.snippet!.description!,
+          customUrl: channel.snippet!.customUrl || undefined,
+          publishedAt: channel.snippet!.publishedAt!,
+          thumbnails: transformThumbnails(channel.snippet!.thumbnails!),
+          country: channel.snippet!.country || undefined
+        },
+        statistics: {
+          viewCount: channel.statistics!.viewCount!,
+          subscriberCount: channel.statistics!.subscriberCount!,
+          hiddenSubscriberCount: channel.statistics!.hiddenSubscriberCount!,
+          videoCount: channel.statistics!.videoCount!
+        }
+      }));
+    } catch (error) {
+      this.handleApiError(error);
+      throw error;
+    }
+  }
+
   // YouTube Analytics API methods
   async getChannelAnalytics(params: AnalyticsParams): Promise<any> {
     try {
@@ -269,7 +314,7 @@ export class YouTubeClient {
           filters: params.filters,
           maxResults: params.maxResults,
           sort: params.sort,
-          ids: 'channel==MINE'
+          ids: this.analyticsChannelId
         });
       });
 
@@ -295,7 +340,7 @@ export class YouTubeClient {
           filters: `video==${videoId}`,
           maxResults: params.maxResults,
           sort: params.sort,
-          ids: 'channel==MINE'
+          ids: this.analyticsChannelId
         });
       });
 
@@ -320,7 +365,7 @@ export class YouTubeClient {
           endDate: params.endDate,
           metrics: 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,subscribersGained,subscribersLost',
           dimensions: 'day',
-          ids: 'channel==MINE',
+          ids: this.analyticsChannelId,
           sort: 'day'
         });
       });
@@ -356,7 +401,7 @@ export class YouTubeClient {
             startDate: params.period1Start,
             endDate: params.period1End,
             metrics: params.metrics.join(','),
-            ids: 'channel==MINE'
+            ids: this.analyticsChannelId
           });
         }),
         this.withRetry(async () => {
@@ -364,7 +409,7 @@ export class YouTubeClient {
             startDate: params.period2Start,
             endDate: params.period2End,
             metrics: params.metrics.join(','),
-            ids: 'channel==MINE'
+            ids: this.analyticsChannelId
           });
         })
       ]);

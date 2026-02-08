@@ -5,6 +5,48 @@ import { formatChannelInfo, formatVideoList } from '../../utils/formatters/chann
 
 export const channelTools: ToolConfig[] = [
   {
+    name: "list_channels",
+    description: "List all YouTube channels accessible under the authenticated Google account. Use this to find the correct channel ID for Brand Accounts.",
+    category: "channel",
+    schema: z.object({}),
+    handler: async (_, { getYouTubeClient }: ToolContext) => {
+      try {
+        const youtubeClient = await getYouTubeClient();
+        const channels = await youtubeClient.listChannels();
+
+        if (channels.length === 0) {
+          return {
+            content: [{ type: "text", text: "No channels found for this account." }]
+          };
+        }
+
+        const currentChannelId = process.env.YOUTUBE_CHANNEL_ID;
+        let output = `Channels on this account:\n\n`;
+        channels.forEach((ch: any, i: number) => {
+          const active = currentChannelId === ch.id ? ' (ACTIVE)' : '';
+          output += `${i + 1}. ${ch.snippet.title}${active}\n`;
+          output += `   Channel ID: ${ch.id}\n`;
+          output += `   Subscribers: ${Number(ch.statistics.subscriberCount).toLocaleString()}\n`;
+          output += `   Videos: ${ch.statistics.videoCount}\n`;
+          if (ch.snippet.customUrl) output += `   URL: youtube.com/${ch.snippet.customUrl}\n`;
+          output += `\n`;
+        });
+
+        output += `To target a specific channel, set the YOUTUBE_CHANNEL_ID environment variable.\n`;
+        output += `Example: YOUTUBE_CHANNEL_ID=UCxxxxxxx`;
+
+        return {
+          content: [{ type: "text", text: output }]
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true
+        };
+      }
+    },
+  },
+  {
     name: "get_channel_info",
     description: "Get information about the authenticated YouTube channel",
     category: "channel",
