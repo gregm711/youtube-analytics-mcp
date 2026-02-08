@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "youtube-analytics-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "YouTube Analytics MCP",
   "bin": {
     "youtube-analytics-mcp": "./build/index.js"
@@ -13,7 +13,9 @@
     "inspect": "npx @modelcontextprotocol/inspector tsx src/index.ts",
     "test": "npm run build && ./test_all_tools.sh && npm run inspect"
   },
-  "files": ["build"],
+  "files": [
+    "build"
+  ],
   "author": "dogfrogfog",
   "license": "MIT",
   "dependencies": {
