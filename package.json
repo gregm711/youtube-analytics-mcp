@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "youtube-analytics-mcp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "YouTube Analytics MCP",
   "bin": {
     "youtube-analytics-mcp": "./build/index.js"
